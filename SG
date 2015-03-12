@@ -1,0 +1,87 @@
+data demo; *Scatter Plot dataset;
+  set sashelp.demographics; 
+  array chr(*) _character_; array num(*) _numeric_;    
+  do i = 1 to dim(chr); if missing(chr(i)) then delete; end;                            
+  do j = 1 to dim(num); if missing(num(j)) then delete; end;                               
+  drop i j; 
+
+*Table A.1. SG procedures for creating Fig. 1;
+PROC SGPLOT DATA = demo; 
+	TITLE 'Net Primary School Enrollment Ratio - Female vs. Male';
+  *WHERE adultliteracypct between 0.5 and 0.9;
+	SCATTER Y = FemaleSchoolPct X = MaleSchoolPct/ DATALABEL = name MARKERATTRS =(SYMBOL = trianglefilled COLOR = purple SIZE = 10px);
+	XAXIS OFFSETMIN=0.09 OFFSETMAX=0.09 LABEL ='Male %' VALUES=(.3 to 1 by .1);
+	YAXIS OFFSETMIN = 0.1 OFFSETMAX = 0.1 LABEL = 'Female %';
+title;
+
+
+*****************************************************************************
+*****************************************************************************
+*Table A.2. SG procedures for creating Fig. 2;
+proc sgplot data=demo;
+  title 'Loess Fit of Net Primary School Enrollment Ratio - Female vs. Male';
+  loess y = FemaleSchoolPct x = MaleSchoolPct / clm datalabel = name;
+run;
+
+data dropline; *Weibull, Series Plot with Drop Lines data;
+	lam = 1; k = 1.5;
+	do x = 0 to 4 by 0.01;
+		y = (k/lam)*((x/lam)**(k-1))*exp(-(x/lam)**k);
+		if .5<= x <=4 and abs(x-round(x)) < 1e-6 then x2 = x; else x2 = .;
+		if n(x2) then y2 = y;
+	output; end;
+
+*Table A.2. SG proc for Fig.2 without drop lines and area under the curve;
+PROC SGPLOT DATA = series; 
+	SERIES X = x Y = y / CURVELABEL = 'weibull pdf' LINEATTRS=GRAPHDATA(THICKNESS = 3px COLOR = purple);
+
+
+*****************************************************************************
+*****************************************************************************
+*Table A.3. SG proc for Fig. 5
+proc sgpanel data=demo;
+*/(where=(Region='AFR'))/*;
+  title 'Net Primary School Enrollment Ratio - Female vs. Male By Year';
+  panelby PopPovertyYear / rows=2 columns=3;
+  scatter y = FemaleSchoolPct x = MaleSchoolPct/datalabel = name;
+run;
+
+
+*****************************************************************************
+*****************************************************************************
+/*Fig Stacked Bar Chart*/
+proc sgplot data=demo;
+  title 'Population by Region and Country';
+  hbar region / response=pop stat=sum  group=name;
+run;
+
+
+*****************************************************************************
+*****************************************************************************
+/*Fig Bar Chart with line*/
+proc sgplot data=demo;
+  title 'Adult Literacy Rate Percentage by Region';
+  vbar region / response=AdultLiteracypct stat=mean fillattrs=(color=red) datalabel;
+  vline region / response=gni stat=mean y2axis;
+run;
+
+
+*****************************************************************************
+*****************************************************************************
+/*Fig Box plot*/
+proc sgplot data=demo;
+  title 'Adult Literacy pct Summaries';
+  vbox AdultLiteracypct / category=region;
+run;
+
+
+*****************************************************************************
+*****************************************************************************
+/*Fig Distribution for SG/*
+proc sgplot data=demo;
+  title 'Distribution of Gross National Income per Capita';
+  histogram GNI / showbins scale=proportion;
+  density GNI / type=normal;
+  density GNI / type=kernel;
+  keylegend / location=inside position=topright across=1;run;
+run;
