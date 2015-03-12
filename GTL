@@ -5,15 +5,6 @@ data demo; *Scatter Plot dataset;
   do j = 1 to dim(num); if missing(num(j)) then delete; end;                               
   drop i j; 
 
-*Table A.1. SG procedures for creating Fig. 1;
-PROC SGPLOT DATA = demo; 
-	TITLE 'Net Primary School Enrollment Ratio - Female vs. Male';
-  *WHERE adultliteracypct between 0.5 and 0.9;
-	SCATTER Y = FemaleSchoolPct X = MaleSchoolPct/ DATALABEL = name MARKERATTRS =(SYMBOL = trianglefilled COLOR = purple SIZE = 10px);
-	XAXIS OFFSETMIN=0.09 OFFSETMAX=0.09 LABEL ='Male %' VALUES=(.3 to 1 by .1);
-	YAXIS OFFSETMIN = 0.1 OFFSETMAX = 0.1 LABEL = 'Female %';
-title;
-
 *Table 1a. SAS Code for creating a scatter plot using the GTL and PROC SGRENDER procedure.
 PROC TEMPLATE;
   DEFINE STATGRAPH scatter;
@@ -33,150 +24,126 @@ PROC SGRENDER DATA=demo TEMPLATE=Scatter;
 
 *****************************************************************************
 *****************************************************************************
-*Table A.2. SG procedures for creating Fig. 2;
-proc sgplot data=demo;
-  title 'Loess Fit of Net Primary School Enrollment Ratio - Female vs. Male';
-  loess y = FemaleSchoolPct x = MaleSchoolPct / clm datalabel = name;
-run;
-
-data dropline; *Weibull, Series Plot with Drop Lines data;
-	lam = 1; k = 1.5;
-	do x = 0 to 4 by 0.01;
-		y = (k/lam)*((x/lam)**(k-1))*exp(-(x/lam)**k);
-		if .5<= x <=4 and abs(x-round(x)) < 1e-6 then x2 = x; else x2 = .;
-		if n(x2) then y2 = y;
-	output; end;
+DATA dropline; *Weibull, Series Plot with Drop Lines data;
+  lam = 1; k = 1.5;
+    do x = 0 to 4 by 0.01;
+      y = (k/lam)*((x/lam)**(k-1))*exp(-(x/lam)**k);
+	if .5<= x <=4 and abs(x-round(x)) < 1e-6 then x2 = x; else x2 = .;
+	if n(x2) then y2 = y;
+  OUTPUT; 
+END;
 
 * Table 2a. The GTL template for creating a Weibull Series Plots with Drop Lines.
 PROC TEMPLATE; 
-DEFINE STATGRAPH Weibull; 
-BEGINGRAPH;
-	LAYOUT OVERLAY;
-    SERIESPLOT X=x Y=y / CURVELABEL='Weibull PDF' LINEATTRS=GRAPHDATA(THICKNESS= 3);
-	  DROPLINE X=x2 Y=y2 / DROPTO=X;
-	  SCATTERPLOT X = eval(x2 - 0.5) Y =eval(0*x +  0.1)/ 
-	  MARKERCHARACTER = EVAL(put(1-exp(-x**1.5),3.2))*cdf; MARKERCHARACTERATTRS=(SIZE=10);
-	ENDLAYOUT; ENDGRAPH; END;
-PROC SGRENDER DATA = dropline TEMPLATE = weibull;
-
-*Table A.2. SG proc for Fig.2 without drop lines and area under the curve;
-PROC SGPLOT DATA = series; 
-	SERIES X = x Y = y / CURVELABEL = 'weibull pdf' LINEATTRS=GRAPHDATA(THICKNESS = 3px COLOR = purple);
+  DEFINE STATGRAPH Weibull; 
+    BEGINGRAPH;
+      LAYOUT OVERLAY;
+        SERIESPLOT X=x Y=y / CURVELABEL='Weibull PDF' LINEATTRS=GRAPHDATA(THICKNESS= 3);
+        DROPLINE X=x2 Y=y2 / DROPTO=X;
+        SCATTERPLOT X = eval(x2 - 0.5) Y =eval(0*x +  0.1)/ 
+        MARKERCHARACTER = EVAL(put(1-exp(-x**1.5),3.2))*cdf; MARKERCHARACTERATTRS=(SIZE=10);
+      ENDLAYOUT; 
+    ENDGRAPH; 
+END;
+PROC SGRENDER DATA = dropline TEMPLATE = Weibull;
 
 
 *****************************************************************************
 *****************************************************************************
-*Table A.3. SG proc for Fig. 5
-proc sgpanel data=demo;
-*/(where=(Region='AFR'))/*;
-  title 'Net Primary School Enrollment Ratio - Female vs. Male By Year';
-  panelby PopPovertyYear / rows=2 columns=3;
-  scatter y = FemaleSchoolPct x = MaleSchoolPct/datalabel = name;
-run;
-
 * Table 3. GTL for creating Scatter Matrix with univariate histograms on the diagonal.
-proc template;
-	define statgraph scattermatrix;
-	begingraph/ designheight = defaultdesignwidth; *height=width;
-			entrytitle 'scatterplot';
-			LAYOUT GRIDDED;
-		    SCATTERPLOTMATRIX msrp horsepower mpg_highway / ellipse = (type = predicted) diagonal = (histogram normal kernel) group = drivetrain markerattrs = (size = 15);
-			endlayout;
-	endgraph; 
-end;
+PROC TEMPLATE;
+  DEFINE STATGRAPH scattermatrix;
+    BEGINGRAPH / designheight = defaultdesignwidth; *height=width;
+      ENTRYTITLE 'scatterplot';
+      LAYOUT GRIDDED;
+        SCATTERPLOTMATRIX msrp horsepower mpg_highway / ellipse = (type = predicted) diagonal = (histogram normal kernel) 
+        group = drivetrain markerattrs = (size = 15);
+      ENDLAYOUT;
+    ENDGRAPH;
+END;
 
-proc sgrender data = cars(where=(make = 'honda')) template = scattermatrix;
-
+PROC SGRENDER DATA = cars(where = (make = 'honda')) TEMPLATE = scattermatrix;
 
 
 *****************************************************************************
 *****************************************************************************
 * Table 4. Add multiple graphs to one panel in GTL.
-proc template; define statgraph multi; 
-begingraph; 
-entrytitle 'scatter plot matrix';
-	LAYOUT LATTICE / rows=1 columns=2 
-	rowgutter = 5 columngutter = 5;
-scatterplot y=msrp x=horsepower / group = drivetrain; /* (1) */
-			LAYOUT OVERLAY;
-		scatterplot y=msrp x=mpg_highway /group=drivetrain 
-		datatransparency=.8;
-regressionplot y=msrp x= mpg_hwy / group = drivetrain name = 'r';
-			discretelegend 'r'/	halign=right;
-			ENDLAYOUT;
-		ENDLAYOUT; ENDGRAPH; END;
-proc sort; by drivetrain;
-proc sgrender data = cars template=… 
+PROC TEMPLATE;
+DEFINE STATGRAPH multi;
+  BEGINGRAPH; 
+    ENTRYTITLE 'scatter plot matrix';
+    LAYOUT LATTICE / rows=1 columns=2 
+      ROWGUTTER = 5 columngutter = 5;
+      SCATTERPLOT y=msrp x=horsepower / group = drivetrain; /* (1) */
+      LAYOUT OVERLAY;
+        SCATTERPLOT y=msrp x=mpg_highway /group=drivetrain datatransparency=.8;
+        REGRESSIONPLOT y=msrp x= mpg_hwy / group = drivetrain name = 'r';
+        discretelegend 'r'/  halign=right;
+      ENDLAYOUT;
+    ENDLAYOUT; 
+  ENDGRAPH; 
+END;
+
+PROC SORT; 
+BY drivetrain;
+
+PROC SGRENDER DATA = cars TEMPLATE = multi;
 
 
 *****************************************************************************
 *****************************************************************************
 * Table 5. GTL for creating a Data Panel.
 proc template;
-	define statgraph panel;
-		begingraph;
-entrytitle 'Net Primary School Enrollment Ratio - Female vs. Male By Poverty Year';
-LAYOUT DATAPANEL CLASSVARS = (PopPovertyYear) / rows=2 columns=3;
-			LAYOUT PROTOTYPE;
-scatterplot y = FemaleSchoolPct x = MaleSchoolPct/datalabel = name;
-			endlayout;
-		endlayout; endgraph; end;
+  define statgraph panel;
+    begingraph;
+      entrytitle 'Net Primary School Enrollment Ratio - Female vs. Male By Poverty Year';
+      LAYOUT DATAPANEL CLASSVARS = (PopPovertyYear) / rows=2 columns=3;
+        LAYOUT PROTOTYPE;
+          scatterplot y = FemaleSchoolPct x = MaleSchoolPct/datalabel = name;
+        ENDLAYOUT;
+      ENDLAYOUT; 
+    ENDGRAPH;
+END;
 proc sgrender data=demo template=panel;
 */(where=(Region='AFR'))/*;
 
 *****************************************************************************
 *****************************************************************************
 * Table 6. Residual panel of predictors for MSRP.
-*Table A.4. SG proc for Fig. 6
 proc format;
-	value $origin	'USA' = 'U'
-				'Europe' = 'E'
-				'Asia' = 'A';
+  value $origin  'USA' = 'U'
+        'Europe' = 'E'
+        'Asia' = 'A';
+
 proc glm data=sashelp.cars noprint;
-class origin;
-model msrp =horsepower origin;
-format origin $origin.;
-output out=res r=r;
+  class origin;
+  model msrp =horsepower origin;
+  format origin $origin.;
+  output out=res r=r;
 
 proc template;
-	define statgraph ResidualPanel;
-	begingraph;
-entrytitle 'Residuals by Predictors for MSRP';
-layout lattice / rows=1 columns=2 columngutter=10 ;
-	boxplot y=r x=origin;
-layout overlay;
-scatterplot y=r x=horsepower / markercharacter=origin markercharacterattrs = (size = 10) group=origin;
-		regressionplot y=r x=horsepower / linearattrs = (color=gray) degree = 3;
-		endlayout;
-	endlayout; endgraph; end;
-ods graphics on / 
-height=480px width=900px;
+  define statgraph ResidualPanel;
+  begingraph;
+    entrytitle 'Residuals by Predictors for MSRP';
+    layout lattice / rows=1 columns=2 columngutter=10 ;
+      boxplot y=r x=origin;
+      layout overlay;
+        scatterplot y=r x=horsepower / markercharacter=origin markercharacterattrs = (size = 10) group=origin;
+        regressionplot y=r x=horsepower / linearattrs = (color=gray) degree = 3;
+      endlayout;
+    endlayout; 
+  endgraph; 
+end;
+
+ods graphics on / height=480px width=900px;
 proc sgrender data=res template = ResidualPanel; 
   label r ='Residual';
+
 ods graphics on / reset=all;
 
 
 *****************************************************************************
 *****************************************************************************
-/*Fig Stacked Bar Chart*/
-proc sgplot data=demo;
-  title 'Population by Region and Country';
-  hbar region / response=pop stat=sum  group=name;
-run;
-
-/*Fig Bar Chart with line*/
-proc sgplot data=demo;
-  title 'Adult Literacy Rate Percentage by Region';
-  vbar region / response=AdultLiteracypct stat=mean fillattrs=(color=red) datalabel;
-  vline region / response=gni stat=mean y2axis;
-run;
-
-/*Fig Box plot*/
-proc sgplot data=demo;
-  title 'Adult Literacy pct Summaries';
-  vbox AdultLiteracypct / category=region;
-run;
-
 /*Fig Fit function for gtl*/
 proc template;
   define statgraph Fits;
@@ -190,12 +157,3 @@ proc template;
 end;
 
 proc sgrender data=demo template=Fits;
-
-/*Fig Distribution for SG/*
-proc sgplot data=demo;
-  title 'Distribution of Gross National Income per Capita';
-  histogram GNI / showbins scale=proportion;
-  density GNI / type=normal;
-  density GNI / type=kernel;
-  keylegend / location=inside position=topright across=1;run;
-run;
